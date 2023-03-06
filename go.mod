@@ -1,4 +1,4 @@
-module github.com/go-resty/resty/v2
+module github.com/gozelle/resty
 
 require golang.org/x/net v0.0.0-20211029224645-99673261e6eb
 
