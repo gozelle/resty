@@ -75,7 +75,7 @@ func (a *Agent) logger() *logger.Logger {
 	return a.eventLogger
 }
 
-func defaultAccept(resp *resty.Response) error {
+func defaultAccepter(resp *resty.Response) error {
 	if resp.IsSuccess() {
 		return nil
 	}
@@ -187,7 +187,7 @@ func (a *Agent) Request(ctx context.Context, method, uri string, opts ...Option)
 		return
 	}
 	
-	var accept = defaultAccept
+	var accept = defaultAccepter
 	if a.accepter != nil {
 		accept = a.accepter
 	}
