@@ -60,7 +60,7 @@ type Agent struct {
 	host        *url.URL
 	client      *resty.Client
 	debug       bool
-	accept      func(resp *resty.Response) (err error)
+	accepter    func(resp *resty.Response) (err error)
 	eventLogger *logger.Logger
 }
 
@@ -82,8 +82,8 @@ func defaultAccept(resp *resty.Response) error {
 	return fmt.Errorf("request error: %s", resp.Status())
 }
 
-func (a *Agent) SetAccept(accept func(resp *resty.Response) (err error)) {
-	a.accept = accept
+func (a *Agent) SetAccepter(accepter func(resp *resty.Response) (err error)) {
+	a.accepter = accepter
 }
 
 func (a *Agent) fork() *Agent {
@@ -188,8 +188,8 @@ func (a *Agent) Request(ctx context.Context, method, uri string, opts ...Option)
 	}
 	
 	var accept = defaultAccept
-	if a.accept != nil {
-		accept = a.accept
+	if a.accepter != nil {
+		accept = a.accepter
 	}
 	
 	err = accept(resp)
