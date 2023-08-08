@@ -11,15 +11,14 @@ type Binder struct {
 	data []byte
 }
 
-func (b Binder) Bind(ptr any) (err error) {
+func (b Binder) Bind(ptr any) error {
 	if b.err != nil {
 		return b.err
 	}
-	return nil
+	return b.bind(ptr)
 }
 
 func (b Binder) bind(ptr any) (err error) {
-	
 	t := reflect.ValueOf(ptr)
 	if t.Kind() != reflect.Ptr {
 		err = fmt.Errorf("bind method expect a pointer, got: %s kind: %s", t.Type(), t.Kind())
@@ -28,7 +27,6 @@ func (b Binder) bind(ptr any) (err error) {
 		err = fmt.Errorf("the ptr is nil, please pass &ptr")
 		return
 	}
-	
 	return json.Unmarshal(b.data, ptr)
 }
 

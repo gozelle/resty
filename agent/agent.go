@@ -2,9 +2,15 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"github.com/gozelle/color"
+	"github.com/gozelle/humanize"
+	"github.com/gozelle/logger"
 	"github.com/gozelle/resty"
-	"path"
+	"net/url"
+	"strings"
+	"time"
 )
 
 type Option func(r *options)
@@ -46,15 +52,27 @@ func WithAfterRequest(fn func(req *resty.Request) error) Option {
 	}
 }
 
-func NewAgent(client *resty.Client, host string) *Agent {
+func NewAgent(client *resty.Client, host *url.URL) *Agent {
 	return &Agent{client: client, host: host}
 }
 
 type Agent struct {
-	host   string
-	client *resty.Client
-	debug  bool
-	accept func(resp *resty.Response) (err error)
+	host        *url.URL
+	client      *resty.Client
+	debug       bool
+	accept      func(resp *resty.Response) (err error)
+	eventLogger *logger.Logger
+}
+
+func (a *Agent) SetLogger(logger *logger.Logger) {
+	a.eventLogger = logger
+}
+
+func (a *Agent) logger() *logger.Logger {
+	if a.eventLogger == nil {
+		a.eventLogger = logger.WithSkip(logger.NewLogger("resty-agent"), 3)
+	}
+	return a.eventLogger
 }
 
 func defaultAccept(resp *resty.Response) error {
@@ -75,8 +93,8 @@ func (a *Agent) fork() *Agent {
 	}
 }
 
-func (a *Agent) url(url string) string {
-	return path.Join(a.host, url)
+func (a *Agent) url(uri string) string {
+	return a.host.JoinPath(uri).String()
 }
 
 func (a *Agent) Debug() *Agent {
@@ -85,14 +103,62 @@ func (a *Agent) Debug() *Agent {
 	return aa
 }
 
+func (a *Agent) debugPrint(req *resty.Request, resp *resty.Response, err error, cost time.Duration) {
+	if !a.debug {
+		return
+	}
+	
+	info := &strings.Builder{}
+	u, _ := url.PathUnescape(req.URL)
+	info.WriteString(fmt.Sprintf("\n[%s] %s %s:", color.YellowString(cost.String()), color.BlueString(req.Method), u))
+	space := fmt.Sprintf("|%s", strings.Repeat("-", 3))
+	if req.Header != nil && len(req.Header) > 0 {
+		d, _ := json.Marshal(req.Header)
+		info.WriteString(fmt.Sprintf("\n%sheader: %s", space, string(d)))
+	}
+	if req.Body != nil {
+		var body string
+		switch v := req.Body.(type) {
+		case string:
+			body = v
+		case []byte:
+			body = string(v)
+		default:
+			d, _ := json.Marshal(req.Body)
+			body = string(d)
+		}
+		info.WriteString(fmt.Sprintf("\n%sbody: %s", space, body))
+	}
+	
+	if resp != nil {
+		info.WriteString(fmt.Sprintf("\n%sstatus: %s", space, resp.Status()))
+		info.WriteString(fmt.Sprintf("\n%scontent size: %s", space, humanize.Bytes(uint64(resp.Size()))))
+		if resp.Size() > 0 {
+			info.WriteString(fmt.Sprintf("\n%sdata: %s", space, resp.String()))
+		}
+	}
+	
+	if err != nil {
+		info.WriteString(fmt.Sprintf("\n%serror: %s", space, color.RedString(err.Error())))
+	}
+	
+	a.logger().Debug(info.String())
+}
+
 func (a *Agent) Request(ctx context.Context, method, uri string, opts ...Option) (b Binder) {
 	
-	var err error
+	var (
+		req  *resty.Request
+		resp *resty.Response
+		err  error
+	)
+	now := time.Now()
 	defer func() {
+		a.debugPrint(req, resp, err, time.Since(now))
 		b.err = err
 	}()
 	
-	req := a.client.R()
+	req = a.client.R()
 	req.SetContext(ctx)
 	
 	_opts := &options{}
@@ -114,7 +180,9 @@ func (a *Agent) Request(ctx context.Context, method, uri string, opts ...Option)
 		}
 	}
 	
-	resp, err := req.Execute(method, uri)
+	req.Method = method
+	req.URL = a.url(uri)
+	resp, err = req.Send()
 	if err != nil {
 		return
 	}
