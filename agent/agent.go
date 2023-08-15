@@ -103,14 +103,14 @@ func (a *Agent) Debug() *Agent {
 	return aa
 }
 
-func (a *Agent) debugPrint(req *resty.Request, resp *resty.Response, err error, cost time.Duration) {
+func (a *Agent) debugPrintRequest(req *resty.Request, ) {
 	if !a.debug {
 		return
 	}
 	
 	info := &strings.Builder{}
 	u, _ := url.PathUnescape(req.URL)
-	info.WriteString(fmt.Sprintf("\n[%s] %s %s:", color.YellowString(cost.String()), color.BlueString(req.Method), u))
+	info.WriteString(fmt.Sprintf("\n[%s] %s %s:", color.CyanString("REQUEST"), color.BlueString(req.Method), u))
 	space := fmt.Sprintf("|%s", strings.Repeat("-", 3))
 	if req.Header != nil && len(req.Header) > 0 {
 		d, _ := json.Marshal(req.Header)
@@ -129,9 +129,27 @@ func (a *Agent) debugPrint(req *resty.Request, resp *resty.Response, err error, 
 		}
 		info.WriteString(fmt.Sprintf("\n%sbody: %s", space, body))
 	}
+	a.logger().Debug(info.String())
+}
+
+func (a *Agent) debugPrintResponse(req *resty.Request, resp *resty.Response, err error, cost time.Duration) {
+	if !a.debug {
+		return
+	}
+	
+	info := &strings.Builder{}
+	u, _ := url.PathUnescape(req.URL)
+	info.WriteString(fmt.Sprintf("\n[%s][%s] %s %s:", color.YellowString("RESPONSE"), color.YellowString(cost.String()), color.BlueString(req.Method), u))
+	space := fmt.Sprintf("|%s", strings.Repeat("-", 3))
 	
 	if resp != nil {
-		info.WriteString(fmt.Sprintf("\n%sstatus: %s", space, resp.Status()))
+		var status string
+		if resp.IsSuccess() {
+			status = color.GreenString(resp.Status())
+		} else {
+			status = color.RedString(resp.Status())
+		}
+		info.WriteString(fmt.Sprintf("\n%sstatus: %s", space, status))
 		info.WriteString(fmt.Sprintf("\n%scontent size: %s", space, humanize.Bytes(uint64(resp.Size()))))
 		if resp.Size() > 0 {
 			info.WriteString(fmt.Sprintf("\n%sdata: %s", space, resp.String()))
@@ -154,7 +172,7 @@ func (a *Agent) Request(ctx context.Context, method, uri string, opts ...Option)
 	)
 	now := time.Now()
 	defer func() {
-		a.debugPrint(req, resp, err, time.Since(now))
+		a.debugPrintResponse(req, resp, err, time.Since(now))
 		b.err = err
 	}()
 	
@@ -182,6 +200,9 @@ func (a *Agent) Request(ctx context.Context, method, uri string, opts ...Option)
 	
 	req.Method = method
 	req.URL = a.url(uri)
+	
+	a.debugPrintRequest(req)
+	
 	resp, err = req.Send()
 	if err != nil {
 		return
