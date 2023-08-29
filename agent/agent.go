@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
+	"strings"
+	"time"
+
 	"github.com/gozelle/color"
 	"github.com/gozelle/humanize"
 	"github.com/gozelle/logger"
 	"github.com/gozelle/resty"
-	"net/url"
-	"strings"
-	"time"
 )
 
 type Option func(r *options)
@@ -103,11 +104,11 @@ func (a *Agent) Debug() *Agent {
 	return aa
 }
 
-func (a *Agent) debugPrintRequest(req *resty.Request, ) {
+func (a *Agent) debugPrintRequest(req *resty.Request) {
 	if !a.debug {
 		return
 	}
-	
+
 	info := &strings.Builder{}
 	u, _ := url.PathUnescape(req.URL)
 	info.WriteString(fmt.Sprintf("\n[%s] %s %s:", color.CyanString("REQUEST"), color.BlueString(req.Method), u))
@@ -136,12 +137,12 @@ func (a *Agent) debugPrintResponse(req *resty.Request, resp *resty.Response, err
 	if !a.debug {
 		return
 	}
-	
+
 	info := &strings.Builder{}
 	u, _ := url.PathUnescape(req.URL)
 	info.WriteString(fmt.Sprintf("\n[%s][%s] %s %s:", color.YellowString("RESPONSE"), color.YellowString(cost.String()), color.BlueString(req.Method), u))
 	space := fmt.Sprintf("|%s", strings.Repeat("-", 3))
-	
+
 	if resp != nil {
 		var status string
 		if resp.IsSuccess() {
@@ -155,16 +156,16 @@ func (a *Agent) debugPrintResponse(req *resty.Request, resp *resty.Response, err
 			info.WriteString(fmt.Sprintf("\n%sdata: %s", space, resp.String()))
 		}
 	}
-	
+
 	if err != nil {
 		info.WriteString(fmt.Sprintf("\n%serror: %s", space, color.RedString(err.Error())))
 	}
-	
+
 	a.logger().Debug(info.String())
 }
 
 func (a *Agent) Request(ctx context.Context, method, uri string, opts ...Option) (b Binder) {
-	
+
 	var (
 		req  *resty.Request
 		resp *resty.Response
@@ -175,49 +176,49 @@ func (a *Agent) Request(ctx context.Context, method, uri string, opts ...Option)
 		a.debugPrintResponse(req, resp, err, time.Since(now))
 		b.err = err
 	}()
-	
+
 	req = a.client.R()
 	req.SetContext(ctx)
-	
+
 	_opts := &options{}
 	for _, v := range opts {
 		v(_opts)
 	}
-	
+
 	req.Body = _opts.requestBody
 	if _opts.requestHeader != nil {
 		for k, v := range _opts.requestHeader {
 			req.SetHeader(k, v)
 		}
 	}
-	
+
 	if _opts.requestInjector != nil {
 		err = _opts.requestInjector(req)
 		if err != nil {
 			return
 		}
 	}
-	
+
 	req.Method = method
 	req.URL = a.url(uri)
-	
+
 	a.debugPrintRequest(req)
-	
+
 	resp, err = req.Send()
 	if err != nil {
 		return
 	}
-	
+
 	var accept = defaultAccepter
 	if a.accepter != nil {
 		accept = a.accepter
 	}
-	
+
 	err = accept(resp)
 	if err != nil {
 		return
 	}
-	
+
 	data := resp.Body()
 	if _opts.responseFilter != nil {
 		data, err = _opts.responseFilter(resp)
@@ -226,6 +227,6 @@ func (a *Agent) Request(ctx context.Context, method, uri string, opts ...Option)
 		}
 	}
 	b.data = data
-	
+
 	return
 }
