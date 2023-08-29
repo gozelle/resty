@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"github.com/gozelle/color"
 	"github.com/gozelle/humanize"
-	"github.com/gozelle/logger"
+	"github.com/gozelle/logger/v2"
 	"github.com/gozelle/resty"
 	"net/url"
 	"strings"
@@ -61,16 +61,16 @@ type Agent struct {
 	client      *resty.Client
 	debug       bool
 	accepter    func(resp *resty.Response) (err error)
-	eventLogger *logger.Logger
+	eventLogger *logger.ZapEventLogger
 }
 
-func (a *Agent) SetLogger(logger *logger.Logger) {
+func (a *Agent) SetLogger(logger *logger.ZapEventLogger) {
 	a.eventLogger = logger
 }
 
-func (a *Agent) logger() *logger.Logger {
+func (a *Agent) logger() *logger.ZapEventLogger {
 	if a.eventLogger == nil {
-		a.eventLogger = logger.WithSkip(logger.NewLogger("resty-agent"), 3)
+		a.eventLogger = logger.WithSkip(logger.Logger("resty-agent"), 3)
 	}
 	return a.eventLogger
 }

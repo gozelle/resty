@@ -17,6 +17,7 @@ require (
 	github.com/gozelle/isatty v0.0.17 // indirect
 	github.com/gozelle/log v0.2.2 // indirect
 	github.com/gozelle/logger v0.0.0-20230808060726-844dbcc32ecf // indirect
+	github.com/gozelle/logger/v2 v2.5.0 // indirect
 	github.com/gozelle/logging v0.0.0-20230111081457-6f16f4dd5a46 // indirect
 	github.com/gozelle/multierr v1.9.10 // indirect
 	github.com/gozelle/spew v1.1.17 // indirect
@@ -29,6 +30,9 @@ require (
 	github.com/muesli/reflow v0.3.0 // indirect
 	github.com/muesli/termenv v0.15.1 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
+	go.uber.org/atomic v1.7.0 // indirect
+	go.uber.org/multierr v1.6.0 // indirect
+	go.uber.org/zap v1.19.1 // indirect
 	golang.org/x/sys v0.6.0 // indirect
 )
 
